@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ランダムマスキング対応：包括的ソースコードマスキングシステム</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>ランダムマスキング対応</h1>
+    <p>ソースコードを入力し、「マスキング実行」ボタンをクリックしてください。</p>
+    <textarea id="sourceCode" placeholder="ここにソースコードを入力してください"></textarea>
+    <button onclick="maskSensitiveInfo()">マスキング実行</button>
+    <div id="result"></div>
+
+    <script>
+    function generateRandomString(length, type) {
+        const chars = {
+            alphanum: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+            hex: '0123456789ABCDEF',
+            num: '0123456789',
+            alpha: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+        };
+        const characters = chars[type] || chars.alphanum;
+        return Array.from({length}, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
+    }
+
+    function maskSensitiveInfo() {
+        let code = document.getElementById('sourceCode').value;
+
+        // 機密情報のマスキングルール
+        const maskingRules = [
+            { name: 'APIキー', pattern: /(['"`])(api[_-]?key|access[_-]?token)([^'"`]*)\1/gi, replacement: (match, p1, p2, p3) => `${p1}${p2}${generateRandomString(p3.length, 'alphanum')}${p1}` },
+            { name: 'データベース接続文字列', pattern: /((['"`]).*?)\2/g, replacement: (match, p1, p2) => `${p2}${generateRandomString(p1.length - 2, 'alphanum')}${p2}` },
+            { name: 'パスワード', pattern: /(['"`])(password|passwd|pwd)([^'"`]*)\1/gi, replacement: (match, p1, p2, p3) => `${p1}${p2}${generateRandomString(p3.length, 'alphanum')}${p1}` },
+            { name: '秘密鍵', pattern: /(-----BEGIN[^-]+PRIVATE KEY-----[\s\S]*?-----END[^-]+PRIVATE KEY-----)/g, replacement: (match) => `-----BEGIN PRIVATE KEY-----\n${generateRandomString(400, 'alpha')}\n-----END PRIVATE KEY-----` },
+            { name: 'アクセストークン', pattern: /(['"`])(access_token|auth_token)([^'"`]*)\1/gi, replacement: (match, p1, p2, p3) => `${p1}${p2}${generateRandomString(p3.length, 'alphanum')}${p1}` },
+            { name: 'IPアドレス', pattern: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g, replacement: () => `${generateRandomString(3, 'num')}.${generateRandomString(3, 'num')}.${generateRandomString(3, 'num')}.${generateRandomString(3, 'num')}` },
+            { name: '個人情報', pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, replacement: (match) => `${generateRandomString(match.length - 10, 'alpha')}@example.com` },
+            { name: '環境変数', pattern: /(os\.environ\[(['"`])(\w+)\2\])/g, replacement: '$1 # [MASKED]' },
+            { name: '暗号化キー', pattern: /(['"`])(encryption_key|secret_key)([^'"`]*)\1/gi, replacement: (match, p1, p2, p3) => `${p1}${p2}${generateRandomString(p3.length, 'hex')}${p1}` },
+            { name: 'セッション識別子', pattern: /(['"`])(session_id|sessionid)([^'"`]*)\1/gi, replacement: (match, p1, p2, p3) => `${p1}${p2}${generateRandomString(p3.length, 'alphanum')}${p1}` },
+            { name: '内部URLパス', pattern: /(['"`])(\/[\w\/]+)\1/g, replacement: (match, p1, p2) => `${p1}/${generateRandomString(p2.length - 1, 'alpha')}${p1}` },
+            { name: 'ライセンスキー', pattern: /(['"`])(license[_-]?key)([^'"`]*)\1/gi, replacement: (match, p1, p2, p3) => `${p1}${p2}${generateRandomString(p3.length, 'alphanum')}${p1}` },
+            { name: 'デバッグフラグ', pattern: /(DEBUG|DEVELOPMENT|TEST)\s*=\s*(True|False)/gi, replacement: '$1 = $2 # [MASKED]' },
+            { name: '日本語', pattern: /([一-龯ぁ-んァ-ン]+)/g, replacement: (match) => Array.from({length: match.length}, () => '〇').join('') }
+        ];
+
+        // 各ルールを適用
+        maskingRules.forEach(rule => {
+            code = code.replace(rule.pattern, rule.replacement);
+        });
+
+        // 結果を表示
+        document.getElementById('result').innerHTML = '<h3>マスキング結果:</h3><pre>' + code + '</pre>';
+    }
+    </script>
+</body>
+</html>
